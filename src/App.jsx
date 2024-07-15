@@ -1,10 +1,10 @@
-// src/App.jsx
 import React, { useState } from 'react';
 import TickerInput from './components/TickerInput';
 import GroupCard from './components/GroupCard';
 import ParametersInput from './components/ParametersInput';
 import ExcelUpload from './components/ExcelUpload';
 import './styles/App.css';
+import axios from 'axios';
 
 function App() {
   const [tickers, setTickers] = useState([]);
@@ -52,7 +52,7 @@ function App() {
     if (validateInputs()) {
       // Process tickers
       const processedTickers = tickers;
-  
+
       // Process groups
       const processedGroups = {};
       groups.forEach((group) => {
@@ -62,26 +62,34 @@ function App() {
           item.type,
         ]);
       });
-  
+
       // Extract periods and end date from parameters
       const { periods, endDate } = parameters;
-  
+
       // Log the processed inputs
       console.log('Tickers:', processedTickers);
       console.log('Groups:', processedGroups);
       console.log('Periods:', periods);
       console.log('End Date:', endDate);
-  
+
       // Define the fixed values
       const fields = ['Last Price'];
       const confidence_levels = [0.90, 0.95, 0.99];
       const z_scores = { '90%': 1.28, '95%': 1.65, '99%': 2.33 };
-  
-      // Call the main function (this would be integrated with your backend)
-      // results = main(processedTickers, fields, periods, endDate, confidence_levels, z_scores, processedGroups);
-      // if (results) {
-      //   console.log("All artifacts and data have been processed and displayed.");
-      // }
+
+      // Send data to backend
+      axios.post('http://127.0.0.1:5000/api/save_parameters', {
+        tickers: processedTickers,
+        periods,
+        endDate,
+        groups: processedGroups,
+      })
+      .then(response => {
+        console.log('Data successfully sent to backend:', response.data);
+      })
+      .catch(error => {
+        console.error('There was an error!', error);
+      });
     }
   };
 
