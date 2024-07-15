@@ -36,7 +36,7 @@ const ParametersInput = ({ parameters, setParameters }) => {
           type="text"
           value={period}
           onChange={(e) => setPeriod(e.target.value)}
-          placeholder="Enter Period (e.g., 100 days)"
+          placeholder="Enter Period (e.g., 100 days, 3 weeks, 6 months, 1 year)"
           className="parameters-input-field"
         />
         <button

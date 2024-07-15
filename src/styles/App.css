@@ -26,6 +26,11 @@
     color: white;
     margin-right: 0.5em;
   }
+
+  .generate-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }  
   
   .error-message {
     background-color: #f8d7da;

@@ -59,7 +59,9 @@ function GroupCard({ group, index, updateGroup, removeGroup, tickers }) {
             <option value="FX">FX</option>
             <option value="CDS">CDS</option>
             <option value="Rates">Rates</option>
-            <option value="Equity">Equity</option>
+            <option value="Equity (ETF, Index, Futures)">Equity (ETF, Index, Futures)</option>
+            <option value="Credit Bonds">Credit Bonds</option>
+            <option value="Sov Bonds">Sov Bonds</option>
           </select>
           <button
             onClick={() => removeItem(itemIndex)}

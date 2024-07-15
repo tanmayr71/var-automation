@@ -3,6 +3,7 @@ import TickerInput from './components/TickerInput';
 import GroupCard from './components/GroupCard';
 import ParametersInput from './components/ParametersInput';
 import ExcelUpload from './components/ExcelUpload';
+import Spinner from './components/Spinner';
 import './styles/App.css';
 import axios from 'axios';
 
@@ -11,6 +12,10 @@ function App() {
   const [groups, setGroups] = useState([]);
   const [parameters, setParameters] = useState({ periods: [], endDate: '' });
   const [errorMessage, setErrorMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Get the backend URL from environment variables
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
   const addGroup = () => {
     const newGroup = { name: `Group ${groups.length + 1}`, items: [] };
@@ -50,6 +55,7 @@ function App() {
 
   const generateOutput = () => {
     if (validateInputs()) {
+      setLoading(true);
       // Process tickers
       const processedTickers = tickers;
 
@@ -78,7 +84,8 @@ function App() {
       const z_scores = { '90%': 1.28, '95%': 1.65, '99%': 2.33 };
 
       // Send data to backend
-      axios.post('http://127.0.0.1:5000/api/save_parameters', {
+      console.log('backendUrl:', backendUrl);
+      axios.post(`${backendUrl}/api/save_parameters`, {
         tickers: processedTickers,
         periods,
         endDate,
@@ -86,9 +93,21 @@ function App() {
       })
       .then(response => {
         console.log('Data successfully sent to backend:', response.data);
+
+        // Download the generated file
+        const resultsPath = response.data.results_path;
+        const link = document.createElement('a');
+        link.href = `${backendUrl}/api/download?file_path=${encodeURIComponent(resultsPath)}`;
+        link.setAttribute('download', 'results.xlsx');
+        document.body.appendChild(link);
+        link.click();
+        link.parentNode.removeChild(link);
+
+        setLoading(false); // Set loading to false
       })
       .catch(error => {
         console.error('There was an error!', error);
+        setLoading(false);
       });
     }
   };
@@ -122,12 +141,17 @@ function App() {
           <span>{errorMessage}</span>
         </div>
       )}
-      <button
-        onClick={generateOutput}
-        className="generate-button"
-      >
-        Generate
-      </button>
+      {loading ? (
+        <Spinner />
+      ) : (
+        <button
+          onClick={generateOutput}
+          className="generate-button"
+          disabled={loading} // Disable the button when loading
+        >
+          Generate
+        </button>
+      )}
     </div>
   );
 }

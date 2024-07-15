@@ -1,7 +1,8 @@
 import pandas as pd
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import os
+import logic  # Import the entire logic.py module
 
 app = Flask(__name__)
 CORS(app)
@@ -17,29 +18,22 @@ def save_parameters():
     end_date = data['endDate']
     groups = data['groups']
 
-    # Convert the groups dictionary to a DataFrame
-    group_data = []
-    for group_name, items in groups.items():
-        for item in items:
-            ticker_index, size, item_type = item
-            group_data.append([group_name, tickers[ticker_index], size, item_type])
+    # Define the confidence levels and Z-scores
+    confidence_levels = [0.90, 0.95, 0.99]
+    z_scores = {'90%': 1.28, '95%': 1.65, '99%': 2.33}
 
-    df_groups = pd.DataFrame(group_data, columns=['Group', 'Ticker', 'Size', 'Type'])
+    # Call the main logic function
+    results, file_path = logic.main(tickers, ['Last Price'], periods, end_date, confidence_levels, z_scores, groups)
 
-    # Create DataFrames for tickers, periods, and end_date
-    df_tickers = pd.DataFrame({'Tickers': tickers})
-    df_periods = pd.DataFrame({'Periods': periods})
-    df_end_date = pd.DataFrame({'End Date': [end_date]})
+    return jsonify({'message': 'File saved successfully', 'results_path': file_path})
 
-    # Save the file to a fixed path
-    save_path = os.path.join(os.getcwd(), 'parameters.xlsx')
-    with pd.ExcelWriter(save_path, engine='xlsxwriter') as writer:
-        df_tickers.to_excel(writer, sheet_name='Tickers', index=False)
-        df_periods.to_excel(writer, sheet_name='Periods', index=False)
-        df_end_date.to_excel(writer, sheet_name='End Date', index=False)
-        df_groups.to_excel(writer, sheet_name='Groups', index=False)
-
-    return jsonify({'message': 'File saved successfully', 'path': save_path})
+@app.route('/api/download', methods=['GET'])
+def download_file():
+    file_path = request.args.get('file_path')
+    if file_path:
+        return send_file(file_path, as_attachment=True)
+    else:
+        return jsonify({'error': 'File path not provided'}), 400
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
