@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import TickerInput from './components/TickerInput';
 import GroupCard from './components/GroupCard';
 import ParametersInput from './components/ParametersInput';
+import ExcelUpload from './components/ExcelUpload';
 import './styles/App.css';
 
 function App() {
@@ -87,6 +88,7 @@ function App() {
   return (
     <div className="container">
       <h1 className="title">Portfolio Manager</h1>
+      <ExcelUpload setTickers={setTickers} setGroups={setGroups} />
       <TickerInput tickers={tickers} setTickers={setTickers} />
       <ParametersInput parameters={parameters} setParameters={setParameters} />
       <div className="button-container">

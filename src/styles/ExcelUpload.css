@@ -1,0 +1,16 @@
+.excel-upload {
+    margin-bottom: 1rem;
+  }
+  
+  .upload-button {
+    padding: 0.5em 1em;
+    border: none;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    background-color: #4299e1;
+    color: white;
+  }
+  
+  .upload-button:hover {
+    background-color: #2b6cb0;
+  }
