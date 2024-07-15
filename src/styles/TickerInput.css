@@ -1,0 +1,84 @@
+/* src/components/styles/TickerInput.css */
+.ticker-input {
+    margin-bottom: 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    background-color: #f9fafb;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .ticker-title {
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .ticker-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.375rem;
+    background-color: #ffffff;
+  }
+  
+  .ticker-input-field {
+    flex: 2;
+    padding: 0.5em;
+    margin-right: 0.5em;
+    border: 1px solid #cbd5e0;
+    border-radius: 0.375rem;
+    font-size: 1rem;
+  }
+  
+  .ticker-add-button, .ticker-remove-button, .ticker-collapse-button {
+    padding: 0.4em 0.8em;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.3s;
+  }
+  
+  .ticker-add-button {
+    background-color: #3182ce;
+    color: white;
+    margin-left: 0.5em;
+  }
+  
+  .ticker-add-button:hover {
+    background-color: #2b6cb0;
+  }
+  
+  .ticker-remove-button {
+    background-color: #e53e3e;
+    color: white;
+    margin-left: 0.5em;
+  }
+  
+  .ticker-remove-button:hover {
+    background-color: #c53030;
+  }
+  
+  .ticker-collapse-button {
+    background-color: #718096;
+    color: white;
+  }
+  
+  .ticker-collapse-button:hover {
+    background-color: #4a5568;
+  }
+  
+  .ticker-list {
+    margin-top: 1rem;
+    max-height: 150px;
+    overflow-y: auto;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 0.5rem;
+  }

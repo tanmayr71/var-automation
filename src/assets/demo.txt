@@ -1,0 +1,92 @@
+The input parameters to my program are 
+tickers = [
+    'USDEUR Curncy', 'USDJPY Curncy', 'USDCHF Curncy', 'USDGBP Curncy', 'USDCAD Curncy',
+    'USDAUD Curncy', 'USDNZD Curncy', 'USDNOK Curncy', 'USDSEK Curncy', 'USDMXN Curncy',
+    'USDCNH Curncy', 'KWN+1M Curncy',
+    'IRN+1M Curncy', 'USDTHB CMPN Curncy', 'USDSGD Curncy', 'NTN+1M Curncy',
+    'PPN+1M Curncy', 'USDTWD REGN Curncy', 'CCN+3M Curncy', 'XAU Curncy', 'NQ1 Index',
+]
+
+groups = {
+    'Group 1': [(0, -8.85, 'FX'), (1, 2.55, 'FX'), (2, 14.00, 'FX'), (3, -20.55, 'FX')],
+    'Group 2': [(4, -5.75, 'FX'), (5, -18.60, 'FX'), (6, 10.00, 'FX')],
+    'Group 3': [(7, 4.00, 'FX'), (8, 11.50, 'FX')],
+    'Group 4': [(9, 2.00, 'FX')],
+    'Group 5': [
+        (10, 56.00, 'FX'), (11, -5.50, 'FX'), (12, -43.50, 'FX'), (13, 5.50, 'FX'), 
+        (14, 32.25, 'FX'), (15, -8.50, 'FX'), (16, 1.00, 'FX'), 
+        (17, 4.50, 'FX'), (18, 10.00, 'FX'), (19, 4, 'FX'),
+        (20, 60, 'Equity (ETF, Index, Futures)')
+    ],
+    # 'Group 6': [(19, -2.00, 'FX'), (20, -3.00, 'FX')],
+    # 'Group 7': [(17, 150.00, 'FX'), (36, 3, 'Rates')],
+    # 'Group 8': [
+    #     (24, 4.0, 'Rates'), (25, -0.3, 'Rates'), (26, -5.0, 'Rates'), (28, 9.25, 'Rates'),
+    #     (31, -3.0, 'Rates'), (32, 3.0, 'Rates'), (33, 5.0, 'Rates'), (34, -2.5, 'Rates'),
+    #     (36, 5.0, 'Rates'), (37, 3.0, 'Rates'), (39, 0.0, 'Rates'), (40, 0.0, 'Rates'),
+    #     (41, 0.0, 'Rates'), (42, 0.0, 'Rates'), (43, 5.0, 'Rates'), (44, 10.0, 'Rates'),
+    #     (45, -10.0, 'Rates'), (46, 5.0, 'Rates'), (47, -5.0, 'Rates')
+    # ],
+    # 'Group 9': [(30, 60.00, 'Equity (ETF, Index, Futures)'), (31, 300.00, 'Equity (ETF, Index, Futures)')]
+}
+
+
+
+results = main(tickers, fields, periods, end_date, confidence_levels, z_scores, groups)
+if results:
+    logging.info("All artifacts and data have been processed and displayed.")
+
+def main(tickers, fields, periods, end_date, confidence_levels, z_scores, groups=None):
+    all_results = {}
+    for period in periods:
+        results = calculate_var_artifacts(tickers, fields, period, end_date, confidence_levels, z_scores, groups)
+        if results:
+            all_results[period] = results
+            logging.info(f"Results for period {period} have been calculated and saved.")
+
+            # Log the beta analysis results for each group
+            for group_name, group_result in results['group_results'].items():
+                beta_analysis_results = group_result['beta_analysis']
+                logging.info(f"Beta analysis results for group {group_name} in period {period}: {beta_analysis_results['beta']}")
+            
+            # Log the beta analysis results for the portfolio
+            beta_analysis_results = results['portfolio_results']['beta_analysis']
+            logging.info(f"Beta analysis results for portfolio in period {period}: {beta_analysis_results['beta']}")
+    
+    save_results_to_file(all_results, groups, tickers, fields, confidence_levels)  # Pass the required arguments
+    return all_results
+
+I had code for providing the user input using a excel sheet 
+# Fixed values
+fields = ['Last Price']
+confidence_levels = [0.90, 0.95, 0.99]
+z_scores = {'90%': 1.28, '95%': 1.65, '99%': 2.33}
+
+def read_user_inputs(file_path):
+    # Read tickers
+    tickers_df = pd.read_excel(file_path, sheet_name='Tickers')
+    tickers = tickers_df['Ticker'].tolist()
+
+    # Read groups
+    groups_df = pd.read_excel(file_path, sheet_name='Groups')
+    groups = {}
+    for group_name in groups_df['Group'].unique():
+        group_data = groups_df[groups_df['Group'] == group_name]
+        groups[group_name] = [(row['Index'], row['Size'], row['Type']) for _, row in group_data.iterrows()]
+
+    # Read periods and end date
+    params_df = pd.read_excel(file_path, sheet_name='Parameters')
+    periods_row = params_df[params_df['Parameter'] == 'Periods']
+    periods = periods_row.iloc[0, 1:].dropna().tolist()
+    end_date = params_df[params_df['Parameter'] == 'End Date']['Value'].values[0]
+
+    return tickers, groups, periods, end_date
+
+def main_demo():
+    demo_file_path = r"C:\Users\trathi\Documents\Projects\Bloomberg Tests\Working\Demo\userinputs.xlsx"
+    tickers, groups, periods, end_date = read_user_inputs(demo_file_path)
+    results = main(tickers, fields, periods, end_date, confidence_levels, z_scores, groups)
+    if results:
+        logging.info("All artifacts and data have been processed and displayed.")
+
+main_demo()

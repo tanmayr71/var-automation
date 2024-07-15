@@ -1,0 +1,47 @@
+/* src/components/styles/ParametersInput.css */
+.parameters-input {
+    margin-bottom: 1rem;
+  }
+  
+  .parameters-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+  
+  .parameters-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  
+  .parameters-input-field {
+    flex: 1;
+    padding: 0.5em;
+    margin-right: 0.5em;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.25rem;
+  }
+  
+  .parameters-button {
+    padding: 0.5em 1em;
+    background-color: #4299e1;
+    color: white;
+    border: none;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    margin-right: 0.5em;
+  }
+  
+  .parameters-remove-button {
+    padding: 0.5em 1em;
+    background-color: #f56565;
+    color: white;
+    border: none;
+    border-radius: 0.25rem;
+    cursor: pointer;
+  }
+  
+  .parameters-period {
+    flex: 1;
+  }

@@ -1,0 +1,28 @@
+/* src/App.css */
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.card {
+  padding: 1.5em;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem;
+  background-color: #ffffff;
+}
+
+button {
+  cursor: pointer;
+}
+
+input, select {
+  width: 100%;
+}
+
+input:focus, select:focus {
+  outline: 2px solid #3182ce;
+  outline-offset: 2px;
+}

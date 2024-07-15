@@ -1,0 +1,54 @@
+/* src/components/styles/GroupCard.css */
+.group-card {
+    padding: 1.5em;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1rem;
+    background-color: #ffffff;
+  }
+  
+  .group-name {
+    width: 100%;
+    padding: 0.5em;
+    margin-bottom: 0.5em;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.25rem;
+  }
+  
+  .group-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5em;
+  }
+  
+  .item-select, .item-input {
+    padding: 0.5em;
+    margin-right: 0.5em;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.25rem;
+    flex: 1;
+  }
+  
+  .remove-button, .add-item-button, .remove-group-button {
+    padding: 0.5em 1em;
+    border: none;
+    border-radius: 0.25rem;
+    cursor: pointer;
+  }
+  
+  .remove-button {
+    background-color: #f56565;
+    color: white;
+  }
+  
+  .add-item-button {
+    background-color: #4299e1;
+    color: white;
+    margin-right: 0.5em;
+  }
+  
+  .remove-group-button {
+    background-color: #e53e3e;
+    color: white;
+  }
