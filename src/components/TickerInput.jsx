@@ -1,16 +1,39 @@
-// src/components/TickerInput.jsx
 import React, { useState } from 'react';
+import axios from 'axios';
 import '../styles/TickerInput.css';
 
 const TickerInput = ({ tickers, setTickers }) => {
   const [ticker, setTicker] = useState('');
   const [collapsed, setCollapsed] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Get the backend URL from environment variables
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
   const addTicker = () => {
-    if (ticker.trim() !== '') {
-      setTickers([...tickers, ticker.trim()]);
-      setTicker('');
+    if (ticker.trim() === '') {
+      setErrorMessage('Ticker cannot be empty');
+      return;
     }
+
+    // Call the validation API
+    axios.post(`${backendUrl}/api/validate_tickers`, {
+      tickers: [ticker.trim()],
+    })
+    .then(response => {
+      const { valid_tickers, invalid_tickers } = response.data;
+      if (valid_tickers.length > 0) {
+        setTickers([...tickers, ticker.trim()]);
+        setTicker('');
+        setErrorMessage('');
+      } else {
+        setErrorMessage('Invalid ticker: ' + invalid_tickers[0]);
+      }
+    })
+    .catch(error => {
+      console.error('There was an error validating the ticker!', error);
+      setErrorMessage('Error validating ticker');
+    });
   };
 
   const removeTicker = (index) => {
@@ -50,6 +73,7 @@ const TickerInput = ({ tickers, setTickers }) => {
               Add
             </button>
           </div>
+          {errorMessage && <div className="error-message">{errorMessage}</div>}
           <div className="ticker-list">
             {tickers.map((ticker, index) => (
               <div key={index} className="ticker-item">

@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import os
 import logic  # Import the entire logic.py module
+from validations import validate_tickers
 
 app = Flask(__name__)
 CORS(app)
@@ -34,6 +35,17 @@ def download_file():
         return send_file(file_path, as_attachment=True)
     else:
         return jsonify({'error': 'File path not provided'}), 400
+
+@app.route('/api/validate_tickers', methods=['POST'])
+def validate_tickers_api():
+    data = request.json
+    if not data or 'tickers' not in data:
+        return jsonify({'error': 'Invalid data'}), 400
+
+    tickers = data['tickers']
+    valid_tickers, invalid_tickers = validate_tickers(tickers)
+
+    return jsonify({'valid_tickers': valid_tickers, 'invalid_tickers': invalid_tickers})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
