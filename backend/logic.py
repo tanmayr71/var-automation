@@ -140,10 +140,11 @@ def fill_summary_data(sheet, formats, all_results, periods, measures, confidence
         portfolio_data = all_results[period]['portfolio_results']
         sheet.write(start_row, period_offset, portfolio_data['portfolio_mean'], formats['data'])
         sheet.write(start_row, period_offset + 1, portfolio_data['portfolio_std_dev'], formats['data'])
-        sheet.write(start_row, period_offset + 2, portfolio_data['portfolio_skewness'], formats['data'])
-        sheet.write(start_row, period_offset + 3, portfolio_data['portfolio_kurtosis'], formats['data'])
+        sheet.write(start_row, period_offset + 2, portfolio_data['sharpe_ratio'], formats['data'])
+        sheet.write(start_row, period_offset + 3, portfolio_data['portfolio_skewness'], formats['data'])
+        sheet.write(start_row, period_offset + 4, portfolio_data['portfolio_kurtosis'], formats['data'])
         for i, conf in enumerate(confidence_levels):
-            sheet.write(start_row, period_offset + 4 + i, portfolio_data['portfolio_VaR'][f'{int(conf*100)}%'], formats['data'])
+            sheet.write(start_row, period_offset + 5 + i, portfolio_data['portfolio_VaR'][f'{int(conf*100)}%'], formats['data'])
 
     # Fill in the data for each group and period
     for period_index, period in enumerate(periods):
@@ -152,10 +153,11 @@ def fill_summary_data(sheet, formats, all_results, periods, measures, confidence
             group_data = all_results[period]['group_results'][group]
             sheet.write(row, period_offset, group_data['group_mean'], formats['data'])
             sheet.write(row, period_offset + 1, group_data['group_std_dev'], formats['data'])
-            sheet.write(row, period_offset + 2, group_data['group_skewness'], formats['data'])
-            sheet.write(row, period_offset + 3, group_data['group_kurtosis'], formats['data'])
+            sheet.write(row, period_offset + 2, group_data['sharpe_ratio'], formats['data'])
+            sheet.write(row, period_offset + 3, group_data['group_skewness'], formats['data'])
+            sheet.write(row, period_offset + 4, group_data['group_kurtosis'], formats['data'])
             for i, conf in enumerate(confidence_levels):
-                sheet.write(row, period_offset + 4 + i, group_data['group_VaR'][f'{int(conf*100)}%'], formats['data'])
+                sheet.write(row, period_offset + 5 + i, group_data['group_VaR'][f'{int(conf*100)}%'], formats['data'])
 
     # Insert the images into the summary sheet below the data table
     image_insert_row = last_data_row + 3  # Adjust the row to place the images below the data
@@ -212,7 +214,9 @@ def define_formats(workbook):
         'ticker': workbook.add_format({'border': 1, 'text_wrap': True, 'font_size': 10}),
         'left_align': workbook.add_format({'border': 1, 'align': 'left', 'font_size': 10}),
         'alt_row': workbook.add_format({'bg_color': '#F2F2F2', 'border': 1, 'font_size': 10}),
-        'note': workbook.add_format({'italic': True, 'font_color': '#555555', 'font_size': 10})  # Added note format
+        'note': workbook.add_format({'italic': True, 'font_color': '#555555', 'font_size': 10}),  # Added note format
+        'calc_metrics_header': workbook.add_format({'bold': True, 'bg_color': '#FF5733', 'border': 1, 'align': 'center', 'font_size': 11}),  # New format for VaR Ratio header
+        'calc_metrics_data': workbook.add_format({'border': 1, 'bg_color': '#FFC300', 'num_format': '#,##0.00', 'font_size': 10})  # New format for VaR Ratio data
     }
     return formats
 
@@ -233,15 +237,23 @@ def write_beta_analysis_header(sheet, formats, periods, benchmarks):
     # Write the first row with periods spanning multiple columns
     col = 1  # Start from the second column (first column is for Group/Portfolio)
     for period in periods:
-        sheet.merge_range(0, col, 0, col + len(benchmarks) - 1, period, formats['header'])
-        col += len(benchmarks)
+        sheet.merge_range(0, col, 0, col + len(benchmarks), period, formats['header'])
+        col += len(benchmarks) + 1
 
     # Write the second row with benchmark names
     col = 1  # Start from the second column
     for _ in periods:
+        # First column for VaR Ratio
+        sheet.write(1, col, "VaR Ratio", formats['calc_metrics_header'])
+        col += 1
+        # Next columns for benchmarks
+        
         for benchmark in benchmarks:
             sheet.write(1, col, benchmark[0], formats['sub_header'])  # Write only the benchmark name
             col += 1
+
+benchmarks_tickers = ['DXY Curncy', 'USDCNH Curncy', 'SPX Index', 'CO1 Comdty']
+benchmarks_rates_tickers = ['USOSFR10 CMPN Curncy', 'USOSFR10 CMPT Curncy']
 
 def fill_beta_analysis_data(sheet, formats, all_results, benchmarks, display_in_millions=True):
     row = 2  # Start from the third row
@@ -260,7 +272,24 @@ def fill_beta_analysis_data(sheet, formats, all_results, benchmarks, display_in_
 
     for period_idx, period in enumerate(all_results.keys()):
         period_results = all_results[period]
-        col = 1 + period_idx * len(benchmarks)  # Calculate the start column for each period
+        col_start = 1 + period_idx * (len(benchmarks) + 1)  # Calculate the start column for each period, including space for var_ratio
+        col = col_start
+
+        # Write the var_ratio for each group and portfolio
+        for row_idx, group in enumerate(groups_list):
+            group_beta_analysis = period_results['group_results'].get(group, {}).get('beta_analysis', {})
+            var_ratio = group_beta_analysis.get('var_ratio', None)
+            if var_ratio is not None:
+                sheet.write(row + row_idx, col, float(var_ratio), formats['calc_metrics_data'])
+
+        portfolio_beta_analysis = period_results['portfolio_results']['beta_analysis']
+        var_ratio = portfolio_beta_analysis.get('var_ratio', None)
+        if var_ratio is not None:
+            sheet.write(row + len(groups_list), col, float(var_ratio), formats['calc_metrics_data'])
+
+        # Move to the next column after var_ratio
+        col += 1
+        
         for benchmark in benchmarks:
             for row_idx, group in enumerate(groups_list):
                 group_beta_analysis = period_results['group_results'].get(group, {}).get('beta_analysis', {})
@@ -268,14 +297,20 @@ def fill_beta_analysis_data(sheet, formats, all_results, benchmarks, display_in_
                 beta_value = group_beta.get(benchmark, None)  # Use the full benchmark name
                 if beta_value is not None:
                     if display_in_millions:
-                        beta_value /= 10**6
+                        if benchmark[0] in benchmarks_rates_tickers:
+                            beta_value /= 10**5
+                        else:
+                            beta_value /= 10**6
                     sheet.write(row + row_idx, col, float(beta_value), formats['data'])
             portfolio_beta_analysis = period_results['portfolio_results']['beta_analysis']
             portfolio_beta = portfolio_beta_analysis.get('beta', {})
             beta_value = portfolio_beta.get(benchmark, None)  # Use the full benchmark name
             if beta_value is not None:
                 if display_in_millions:
-                    beta_value /= 10**6
+                    if benchmark[0] in benchmarks_rates_tickers:
+                        beta_value /= 10**5
+                    else:
+                        beta_value /= 10**6
                 sheet.write(row + len(groups_list), col, float(beta_value), formats['data'])
             col += 1
 
@@ -328,7 +363,7 @@ def save_results_to_file(all_results, groups, tickers, fields, confidence_levels
         
         # Define column structure
         periods = list(all_results.keys())
-        measures = ['Mean', 'Std Dev', 'Skewness', 'Kurtosis'] + [f'VaR {int(conf*100)}%' for conf in confidence_levels]
+        measures = ['Mean', 'Std Dev', 'Sharpe Ratio', 'Skewness', 'Kurtosis'] + [f'VaR {int(conf*100)}%' for conf in confidence_levels]
         
         # Write header for the summary sheet
         write_summary_header(summary_sheet, formats, periods, measures, start_row)
@@ -638,11 +673,11 @@ def perform_beta_analysis(portfolio_cumulative_returns, benchmarks_combined, z_s
     logging.info(f"Yhat VaR (confidence level {confidence_level}): {yhat_var}")
 
     # Calculate VaR for the original cumulative sum series for the specific confidence level
-    original_var = calculate_var(y, z_scores)[f"{int(confidence_level*100)}%"]
+    original_var = calculate_var(y.diff().dropna(), z_scores)[f"{int(confidence_level*100)}%"]
     logging.info(f"Original VaR (confidence level {confidence_level}): {original_var}")
     
     # Compute the ratio of VaR values
-    var_ratio = yhat_var / original_var
+    var_ratio = original_var / yhat_var 
     logging.info(f"VaR ratio: {var_ratio}")
     
     # Adjust beta values by multiplying with the ratio of VaR values
@@ -685,12 +720,20 @@ def process_group(group_name, group_info, tickers, actual_changes, field_name, c
     # Perform beta analysis for the group
     logging.info(f"Processing Beta Analysis for group: {group_name}")
     beta_analysis_results = perform_beta_analysis(group_cumulative_returns, benchmarks_combined, z_scores)
+    logging.info(f"Var Ratio for group: {group_name} : {beta_analysis_results['var_ratio']}")
+
+    # Calculate mean and standard deviation
+    group_mean = group_changes.mean()
+    group_std_dev = group_changes.std()
+    
+    # Calculate Sharpe Ratio
+    sharpe_ratio = (group_mean / group_std_dev) * np.sqrt(252)
 
     return {
         'group_daily_changes': group_changes,
         'group_cumulative_returns': group_cumulative_returns,
-        'group_mean': group_changes.mean(),
-        'group_std_dev': group_changes.std(),
+        'group_mean': group_mean,
+        'group_std_dev': group_std_dev,
         'group_VaR': group_VaR,
         'adjusted_VaR': adjusted_VaR,
         'group_skewness': group_skewness,
@@ -700,7 +743,8 @@ def process_group(group_name, group_info, tickers, actual_changes, field_name, c
         'group_tuw': group_tuw,
         'group_hwm': group_hwm,
         'group_hwm_indices': group_hwm_indices,
-        'beta_analysis': beta_analysis_results
+        'beta_analysis': beta_analysis_results,
+        'sharpe_ratio': sharpe_ratio
     }
 
 def process_portfolio(groups, tickers, actual_changes, field_name, confidence_levels, z_scores, benchmarks_combined):
@@ -732,11 +776,18 @@ def process_portfolio(groups, tickers, actual_changes, field_name, confidence_le
     logging.info(f"Processing Beta Analysis for Portfolio")
     beta_analysis_results = perform_beta_analysis(portfolio_cumulative_returns, benchmarks_combined, z_scores)
 
+    # Calculate mean and standard deviation
+    portfolio_mean = portfolio_changes.mean()
+    portfolio_std_dev = portfolio_changes.std()
+    
+    # Calculate Sharpe Ratio
+    sharpe_ratio = (portfolio_mean / portfolio_std_dev) * np.sqrt(252)
+
     return {
         'portfolio_changes': portfolio_changes,
         'portfolio_cumulative_returns': portfolio_cumulative_returns,
-        'portfolio_mean': portfolio_changes.mean(),
-        'portfolio_std_dev': portfolio_changes.std(),
+        'portfolio_mean': portfolio_mean,
+        'portfolio_std_dev': portfolio_std_dev,
         'portfolio_VaR': portfolio_VaR,
         'adjusted_VaR': adjusted_portfolio_VaR,
         'portfolio_skewness': portfolio_skewness,
@@ -746,7 +797,8 @@ def process_portfolio(groups, tickers, actual_changes, field_name, confidence_le
         'portfolio_tuw': portfolio_tuw,
         'portfolio_hwm': portfolio_hwm,  # Include HWM points
         'portfolio_hwm_indices': portfolio_hwm_indices,
-        'beta_analysis': beta_analysis_results
+        'beta_analysis': beta_analysis_results,
+        'sharpe_ratio': sharpe_ratio
     }
 
 def calculate_actual_changes(historical_data, tickers, groups, field_name):
@@ -775,12 +827,12 @@ def calculate_actual_changes(historical_data, tickers, groups, field_name):
 
 def fetch_and_combine_benchmarks(start_date, end_date):
     # Fetch benchmark data
-    benchmarks = ['DXY Curncy', 'USDCNH Curncy', 'SPX Index', 'CO1 Comdty']
+    benchmarks = benchmarks_tickers
     benchmark_data = fetch_historical_data(benchmarks, ['Last Price'], start_date, end_date)
     benchmarks_log_returns = np.log(benchmark_data)
     
     # Fetch benchmark rates data
-    benchmarks_rates = ['USOSFR10 CMPN Curncy', 'USOSFR10 CMPT Curncy']
+    benchmarks_rates = benchmarks_rates_tickers
     benchmarks_rates_data = fetch_historical_data(benchmarks_rates, ['Last Price'], start_date, end_date)
     
     # Concatenate benchmark log returns with benchmark rates data
