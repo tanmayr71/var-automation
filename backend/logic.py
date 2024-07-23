@@ -14,6 +14,7 @@ import logging
 import os
 
 from sklearn.linear_model import LinearRegression
+from sklearn.decomposition import PCA
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -136,33 +137,41 @@ def fill_summary_data(sheet, formats, all_results, periods, measures, confidence
     # Fill in the data for the portfolio and each group
     last_data_row = start_row + len(groups_list) + 1  # Calculate the last data row
     for period_index, period in enumerate(periods):
-        period_offset = period_index * len(measures) + 1
+        period_offset = period_index * len(measures) + 1  # Adjust for correlation column
         portfolio_data = all_results[period]['portfolio_results']
-        sheet.write(start_row, period_offset, portfolio_data['portfolio_mean'], formats['data'])
-        sheet.write(start_row, period_offset + 1, portfolio_data['portfolio_std_dev'], formats['data'])
-        sheet.write(start_row, period_offset + 2, portfolio_data['sharpe_ratio'], formats['data'])
-        sheet.write(start_row, period_offset + 3, portfolio_data['portfolio_skewness'], formats['data'])
-        sheet.write(start_row, period_offset + 4, portfolio_data['portfolio_kurtosis'], formats['data'])
+        
+        # Write correlation values
+        correlation_matrix = all_results[period]['correlation_matrix']
+        sheet.write(start_row, period_offset, 1.0, formats['data'])  # Portfolio correlation with itself is always 1.0
+        for row, group in enumerate(groups_list, start=start_row + 1):
+            sheet.write(row, period_offset, correlation_matrix[group], formats['data'])
+        
+        # Write portfolio data
+        sheet.write(start_row, period_offset + 1, portfolio_data['portfolio_mean'], formats['data'])
+        sheet.write(start_row, period_offset + 2, portfolio_data['portfolio_std_dev'], formats['data'])
+        sheet.write(start_row, period_offset + 3, portfolio_data['sharpe_ratio'], formats['data'])
+        sheet.write(start_row, period_offset + 4, portfolio_data['portfolio_skewness'], formats['data'])
+        sheet.write(start_row, period_offset + 5, portfolio_data['portfolio_kurtosis'], formats['data'])
         for i, conf in enumerate(confidence_levels):
-            sheet.write(start_row, period_offset + 5 + i, portfolio_data['portfolio_VaR'][f'{int(conf*100)}%'], formats['data'])
+            sheet.write(start_row, period_offset + 6 + i, portfolio_data['portfolio_VaR'][f'{int(conf*100)}%'], formats['data'])
 
     # Fill in the data for each group and period
     for period_index, period in enumerate(periods):
-        period_offset = period_index * len(measures) + 1
+        period_offset = period_index * len(measures) + 1  # Adjust for correlation column
         for row, group in enumerate(groups_list, start=start_row + 1):  # Adjust start row for portfolio
             group_data = all_results[period]['group_results'][group]
-            sheet.write(row, period_offset, group_data['group_mean'], formats['data'])
-            sheet.write(row, period_offset + 1, group_data['group_std_dev'], formats['data'])
-            sheet.write(row, period_offset + 2, group_data['sharpe_ratio'], formats['data'])
-            sheet.write(row, period_offset + 3, group_data['group_skewness'], formats['data'])
-            sheet.write(row, period_offset + 4, group_data['group_kurtosis'], formats['data'])
+            sheet.write(row, period_offset + 1, group_data['group_mean'], formats['data'])
+            sheet.write(row, period_offset + 2, group_data['group_std_dev'], formats['data'])
+            sheet.write(row, period_offset + 3, group_data['sharpe_ratio'], formats['data'])
+            sheet.write(row, period_offset + 4, group_data['group_skewness'], formats['data'])
+            sheet.write(row, period_offset + 5, group_data['group_kurtosis'], formats['data'])
             for i, conf in enumerate(confidence_levels):
-                sheet.write(row, period_offset + 5 + i, group_data['group_VaR'][f'{int(conf*100)}%'], formats['data'])
+                sheet.write(row, period_offset + 6 + i, group_data['group_VaR'][f'{int(conf*100)}%'], formats['data'])
 
     # Insert the images into the summary sheet below the data table
     image_insert_row = last_data_row + 3  # Adjust the row to place the images below the data
     for period_index, period in enumerate(periods):
-        period_offset = period_index * len(measures) + 1
+        period_offset = period_index * len(measures) + 1  # Adjust for correlation column
         portfolio_data = all_results[period]['portfolio_results']
         
         # Generate and save the plots
@@ -220,11 +229,6 @@ def define_formats(workbook):
     }
     return formats
 
-# def create_directory(file_prefix):
-#     unique_dir = f"{file_prefix}_{pd.Timestamp.now().strftime('%Y%m%d%H%M%S')}"
-#     os.makedirs(unique_dir, exist_ok=True)
-#     return unique_dir
-
 def create_directory(file_prefix):
     outputs_dir = os.path.join(os.getcwd(), 'outputs')
     if not os.path.exists(outputs_dir):
@@ -255,7 +259,127 @@ def write_beta_analysis_header(sheet, formats, periods, benchmarks):
 benchmarks_tickers = ['DXY Curncy', 'USDCNH Curncy', 'SPX Index', 'CO1 Comdty']
 benchmarks_rates_tickers = ['USOSFR10 CMPN Curncy', 'USOSFR10 CMPT Curncy']
 
-def fill_beta_analysis_data(sheet, formats, all_results, benchmarks, display_in_millions=True):
+pca_tickers = [
+    'USOSFR1 Curncy', 'USOSFR2 Curncy', 'USOSFR3 Curncy', 
+    'USOSFR5 Curncy', 'USOSFR7 Curncy', 'USOSFR10 Curncy', 
+    'USOSFR15 Curncy', 'USOSFR30 Curncy'
+]
+
+def write_pca_loadings_and_variance(sheet, formats, start_row, loadings, explained_variance_ratio):
+    row = start_row + 2  # Move to the next row after the note
+    sheet.write(row, 0, "PCA Loadings", formats['title'])
+    row += 1
+
+    # Write headers for PCA loadings
+    headers = ["Ticker"] + list(loadings.columns)
+    for col_num, header in enumerate(headers):
+        sheet.write(row, col_num, header, formats['header'])
+    row += 1
+
+    # Write PCA loadings
+    for ticker, row_num in zip(loadings.index, range(len(loadings))):
+        sheet.write(row + row_num, 0, ticker[0], formats['left_align'])
+        for col_num, pc in enumerate(loadings.columns):
+            sheet.write(row + row_num, col_num + 1, loadings.at[ticker, pc], formats['data'])
+    row += len(loadings) + 1  # Move to the next row after the PCA loadings
+
+    # Add an empty row for separation
+    row += 1
+
+    # Write headers and data for explained variance ratio
+    sheet.merge_range(row, 0, row, 1, "Explained Variance Ratio", formats['title'])
+    row += 1
+    for i, var in enumerate(explained_variance_ratio):
+        sheet.write(row, i, f"PC{i+1}", formats['header'])
+    row += 1
+    for i, var in enumerate(explained_variance_ratio):
+        sheet.write(row, i, var, formats['data'])
+
+    return row + 1  # Return the next row index after writing
+
+def write_pca_beta_analysis_data(sheet, formats, all_results, start_row, loadings, explained_variance_ratio, display_in_millions=True):
+    pca_components = ['PC1', 'PC2', 'PC3']
+    row = start_row + 2  # Start after a few rows from the start_row
+
+    # Write the header for PCA Beta Analysis
+    sheet.merge_range(row, 0, row, 1, "PCA Beta Analysis", formats['title'])
+    row += 1  # Move to the next row
+
+    # Write the period and PCA components as headers
+    col = 1
+    for period in all_results.keys():
+        # Include an extra column for var_ratio
+        sheet.merge_range(row, col, row, col + len(pca_components), period, formats['header'])
+        sheet.write(row + 1, col, "VaR Ratio", formats['calc_metrics_header'])
+        col += 1
+        for pc in pca_components:
+            sheet.write(row + 1, col, pc, formats['header'])
+            col += 1
+
+    row += 2  # Move to the next row after headers
+
+    # Collect all groups
+    groups_set = set()
+    for period_results in all_results.values():
+        groups_set.update(period_results['group_results'].keys())
+
+    groups_list = list(groups_set)
+
+    # Write the Group/Portfolio names in the first column
+    for row_idx, group in enumerate(groups_list):
+        sheet.write(row + row_idx, 0, group, formats['left_align'])
+    sheet.write(row + len(groups_list), 0, 'Portfolio', formats['left_align'])
+
+    # Write PCA beta values and var_ratio for each group and portfolio
+    for period_idx, period in enumerate(all_results.keys()):
+        period_results = all_results[period]
+        col_start = 1 + period_idx * (len(pca_components) + 1)  # Calculate the start column for each period, including space for var_ratio
+        col = col_start
+
+        # Write the var_ratio for each group
+        for row_idx, group in enumerate(groups_list):
+            group_results = period_results['group_results'].get(group, {})
+            var_ratio = group_results.get('pca_beta_analysis_results', {}).get('var_ratio', None)
+            if var_ratio is not None:
+                sheet.write(row + row_idx, col, float(var_ratio), formats['calc_metrics_data'])
+
+        # Write the var_ratio for the portfolio
+        portfolio_results = period_results.get('portfolio_results', {}).get('pca_beta_analysis_results', {})
+        var_ratio = portfolio_results.get('var_ratio', None)
+        if var_ratio is not None:
+            sheet.write(row + len(groups_list), col, float(var_ratio), formats['calc_metrics_data'])
+
+        col += 1  # Move to the next column after var_ratio
+
+        # Write PCA beta values for each group
+        for row_idx, group in enumerate(groups_list):
+            group_results = period_results['group_results'].get(group, {})
+            pca_beta_analysis = group_results.get('pca_beta_analysis_results', {})
+            for pc_idx, pc in enumerate(pca_components):
+                beta_value = pca_beta_analysis.get('beta', {}).get(pc, None)
+                if beta_value is not None:
+                    if display_in_millions:
+                        beta_value /= 10**5  # Correct the scale for millions
+                    sheet.write(row + row_idx, col + pc_idx, float(beta_value), formats['data'])
+
+        # Write PCA beta values for the portfolio
+        pca_beta_analysis = portfolio_results.get('beta', {})
+        for pc_idx, pc in enumerate(pca_components):
+            beta_value = pca_beta_analysis.get(pc, None)
+            if beta_value is not None:
+                if display_in_millions:
+                    beta_value /= 10**5  # Correct the scale for millions
+                sheet.write(row + len(groups_list), col + pc_idx, float(beta_value), formats['data'])
+
+    # Calculate the row index for the note
+    note_row = row + len(groups_list) + 1
+    if display_in_millions:
+        sheet.write(note_row, 0, "Note: Beta values are displayed in DV01.", formats['note'])
+
+    # Call the method to write the loadings and explained variance ratio
+    write_pca_loadings_and_variance(sheet, formats, note_row, loadings, explained_variance_ratio)
+
+def fill_beta_analysis_data(sheet, formats, all_results, benchmarks, loadings, explained_variance_ratio, display_in_millions=True):
     row = 2  # Start from the third row
     groups_set = set()
 
@@ -319,7 +443,10 @@ def fill_beta_analysis_data(sheet, formats, all_results, benchmarks, display_in_
     if display_in_millions:
         sheet.write(note_row, 0, "Note: Beta values are displayed in millions.", formats['note'])
 
-def write_beta_analysis_to_sheet(workbook, formats, all_results):
+    # Call the method to write PCA beta analysis data
+    write_pca_beta_analysis_data(sheet, formats, all_results, note_row, loadings, explained_variance_ratio, display_in_millions)
+
+def write_beta_analysis_to_sheet(workbook, formats, all_results, loadings, explained_variance_ratio):
     # Define the benchmarks
     benchmarks = [
         ('DXY Curncy', 'Last Price'), 
@@ -336,12 +463,12 @@ def write_beta_analysis_to_sheet(workbook, formats, all_results):
     # Write headers and fill data for beta analysis
     periods = list(all_results.keys())
     write_beta_analysis_header(beta_sheet, formats, periods, benchmarks)
-    fill_beta_analysis_data(beta_sheet, formats, all_results, benchmarks)
+    fill_beta_analysis_data(beta_sheet, formats, all_results, benchmarks, loadings, explained_variance_ratio)
     
     # Adjust column widths for beta analysis sheet
     adjust_column_widths(beta_sheet, pd.DataFrame(columns=['Group/Portfolio'] + [b[0] for b in benchmarks] * len(periods)))
-
-def save_results_to_file(all_results, groups, tickers, fields, confidence_levels, file_prefix='var_results'):
+    
+def save_results_to_file(all_results, groups, tickers, fields, confidence_levels, loadings, explained_variance_ratio, file_prefix='var_results'):
     # Create a unique directory for this call
     unique_dir = create_directory(file_prefix)
     file_name = f"{unique_dir}/{file_prefix}_{pd.Timestamp.now().strftime('%Y%m%d%H%M%S')}.xlsx"
@@ -363,7 +490,7 @@ def save_results_to_file(all_results, groups, tickers, fields, confidence_levels
         
         # Define column structure
         periods = list(all_results.keys())
-        measures = ['Mean', 'Std Dev', 'Sharpe Ratio', 'Skewness', 'Kurtosis'] + [f'VaR {int(conf*100)}%' for conf in confidence_levels]
+        measures = ['Correlation', 'Mean', 'Std Dev', 'Sharpe Ratio', 'Skewness', 'Kurtosis'] + [f'VaR {int(conf*100)}%' for conf in confidence_levels]
         
         # Write header for the summary sheet
         write_summary_header(summary_sheet, formats, periods, measures, start_row)
@@ -465,7 +592,7 @@ def save_results_to_file(all_results, groups, tickers, fields, confidence_levels
         summary_sheet.set_row(start_row + 1, 30)  # Adjust sub-header row height
 
         # Call the function to handle all tasks related to the beta sheet
-        write_beta_analysis_to_sheet(workbook, formats, all_results)
+        write_beta_analysis_to_sheet(workbook, formats, all_results, loadings, explained_variance_ratio)
 
     return file_name
 
@@ -637,8 +764,65 @@ def perform_linear_regression(dependent_var, independent_vars):
     r_squared = model.score(independent_vars, dependent_var)
     return beta, alpha, r_squared
 
+def perform_pca_beta_analysis(return_series, pca_components, z_scores, confidence_level=0.95):
+    logging.info("Starting PCA beta analysis")
+    logging.info(f"pca_components Shape: {pca_components.shape}")
+    
+    # Convert the return series to a dataframe
+    return_series_df = return_series.to_frame(name='Return Series')
+    
+    # Concatenate the return series with the PCA components
+    combined_df = pd.concat([return_series_df, pca_components], axis=1, join='inner')
+    
+    # Align the data by dropping NA values
+    aligned_data = combined_df.dropna()
+    
+    # Prepare dependent and independent variables
+    y = aligned_data.iloc[:, 0]
+    X = aligned_data.iloc[:, 1:]
+    
+    # Perform linear regression
+    beta, alpha, r_squared = perform_linear_regression(y, X)
+    logging.info(f"Linear regression results - Beta: {beta}, Alpha: {alpha}, R-squared: {r_squared}")
+
+    # Create a dictionary for PCA beta values
+    beta_dict = {component: beta_value for component, beta_value in zip(X.columns, beta)}
+
+    # Calculate the yhat series (linear regression cumulative series)
+    yhat = X.dot(beta) + alpha
+    logging.info(f"Yhat series:\n{yhat.head()}")
+    
+    # Convert yhat to a return series by taking the difference
+    yhat_returns = yhat
+    logging.info(f"Yhat returns:\n{yhat_returns.head()}")
+    
+    # Calculate VaR for the yhat return series for the specific confidence level
+    yhat_var = calculate_var(yhat_returns, z_scores)[f"{int(confidence_level*100)}%"]
+    logging.info(f"Yhat VaR (confidence level {confidence_level}): {yhat_var}")
+
+    # Calculate VaR for the original return series for the specific confidence level
+    original_var = calculate_var(y, z_scores)[f"{int(confidence_level*100)}%"]
+    logging.info(f"Original VaR (confidence level {confidence_level}): {original_var}")
+    
+    # Compute the ratio of VaR values
+    var_ratio = original_var / yhat_var 
+    logging.info(f"VaR ratio: {var_ratio}")
+    
+    # Adjust beta values by multiplying with the ratio of VaR values
+    adjusted_beta = {component: beta_value * var_ratio for component, beta_value in zip(X.columns, beta)}
+    logging.info(f"Adjusted beta values: {adjusted_beta}")
+
+    return {
+        'beta': beta_dict,
+        'adjusted_beta': adjusted_beta,
+        'alpha': alpha,
+        'r_squared': r_squared,
+        'var_ratio': var_ratio
+    }
+
 def perform_beta_analysis(portfolio_cumulative_returns, benchmarks_combined, z_scores, confidence_level=0.95):
     logging.info("Starting beta analysis")
+    logging.info(f"benchmarks_combined Shape: {benchmarks_combined.shape}")
     
     # Convert the series to a dataframe
     portfolio_cumulative_returns_df = portfolio_cumulative_returns.to_frame(name='Portfolio Cumulative Returns')
@@ -692,7 +876,7 @@ def perform_beta_analysis(portfolio_cumulative_returns, benchmarks_combined, z_s
         'var_ratio': var_ratio
     }
 
-def process_group(group_name, group_info, tickers, actual_changes, field_name, confidence_levels, z_scores, benchmarks_combined):
+def process_group(group_name, group_info, tickers, actual_changes, field_name, confidence_levels, z_scores, benchmarks_combined, principal_df):
     group_changes = pd.Series(0, index=actual_changes.index, dtype=float)
     logging.info(f"Processing group: {group_name}")
     for idx, size, _ in group_info:
@@ -729,6 +913,11 @@ def process_group(group_name, group_info, tickers, actual_changes, field_name, c
     # Calculate Sharpe Ratio
     sharpe_ratio = (group_mean / group_std_dev) * np.sqrt(252)
 
+    # Call the function once and save the results in pca_beta_analysis_results
+    logging.info(f"Processing Beta Analysis for PCA components in group {group_name}")
+    pca_beta_analysis_results = perform_pca_beta_analysis(group_changes, principal_df, z_scores)
+    logging.info(f"Beta analysis results for PCA components in group {group_name}: {pca_beta_analysis_results['beta']}")
+
     return {
         'group_daily_changes': group_changes,
         'group_cumulative_returns': group_cumulative_returns,
@@ -744,10 +933,11 @@ def process_group(group_name, group_info, tickers, actual_changes, field_name, c
         'group_hwm': group_hwm,
         'group_hwm_indices': group_hwm_indices,
         'beta_analysis': beta_analysis_results,
-        'sharpe_ratio': sharpe_ratio
+        'sharpe_ratio': sharpe_ratio,
+        'pca_beta_analysis_results': pca_beta_analysis_results,
     }
 
-def process_portfolio(groups, tickers, actual_changes, field_name, confidence_levels, z_scores, benchmarks_combined):
+def process_portfolio(groups, tickers, actual_changes, field_name, confidence_levels, z_scores, benchmarks_combined, principal_df):
     portfolio_changes = pd.Series(0, index=actual_changes.index, dtype=float)
     for group_info in groups.values():
         for idx, size, _ in group_info:
@@ -783,6 +973,10 @@ def process_portfolio(groups, tickers, actual_changes, field_name, confidence_le
     # Calculate Sharpe Ratio
     sharpe_ratio = (portfolio_mean / portfolio_std_dev) * np.sqrt(252)
 
+    # Call the function once and save the results in pca_beta_analysis_results
+    logging.info("Processing Beta Analysis for PCA components in Portfolio")
+    pca_beta_analysis_results = perform_pca_beta_analysis(portfolio_changes, principal_df, z_scores)
+    
     return {
         'portfolio_changes': portfolio_changes,
         'portfolio_cumulative_returns': portfolio_cumulative_returns,
@@ -798,7 +992,8 @@ def process_portfolio(groups, tickers, actual_changes, field_name, confidence_le
         'portfolio_hwm': portfolio_hwm,  # Include HWM points
         'portfolio_hwm_indices': portfolio_hwm_indices,
         'beta_analysis': beta_analysis_results,
-        'sharpe_ratio': sharpe_ratio
+        'sharpe_ratio': sharpe_ratio,
+        'pca_beta_analysis_results': pca_beta_analysis_results,
     }
 
 def calculate_actual_changes(historical_data, tickers, groups, field_name):
@@ -840,7 +1035,55 @@ def fetch_and_combine_benchmarks(start_date, end_date):
     
     return benchmarks_combined
 
-def calculate_var_artifacts(tickers, fields, period, end_date, confidence_levels, z_scores, groups=None):
+def pca_analysis(tickers, start_date, end_date):
+    # Fetch historical data
+    price_data = fetch_historical_data(tickers, ['Last Price'], start_date, end_date)
+    
+    # Calculate returns (percentage change)
+    returns_data = price_data.diff().dropna()
+    
+    # Standardize the returns
+    # standardized_returns = (returns_data - returns_data.mean()) / returns_data.std()
+    
+    # Perform PCA
+    pca = PCA(n_components=3)
+    # principal_components = pca.fit_transform(standardized_returns)
+    principal_components = pca.fit_transform(returns_data)
+    
+    principal_df = pd.DataFrame(data=principal_components, columns=['PC1', 'PC2', 'PC3'])
+    principal_df.index = returns_data.index
+    
+    # Create loadings
+    loadings = pd.DataFrame(pca.components_.T, columns=['PC1', 'PC2', 'PC3'], index=price_data.columns)
+    
+    return principal_df, loadings, pca.explained_variance_ratio_
+
+def calculate_correlations_with_portfolio(group_results, portfolio_results):
+    logging.info("Starting correlation calculation with portfolio")
+    
+    # Collect portfolio changes
+    portfolio_changes = portfolio_results['portfolio_changes']
+    logging.debug(f"Portfolio changes:\n{portfolio_changes.head()}")
+    
+    # Create a DataFrame to store the correlations
+    correlations = {'Portfolio': portfolio_changes}
+    for group_name, results in group_results.items():
+        correlations[group_name] = results['group_daily_changes']
+        logging.debug(f"{group_name} changes:\n{results['group_daily_changes'].head()}")
+    
+    # Convert to DataFrame
+    correlations_df = pd.DataFrame(correlations)
+    logging.debug(f"Combined DataFrame for correlation calculation:\n{correlations_df.head()}")
+
+    logging.info(f"Correlations :\n{correlations_df.corr()}")
+    
+    # Calculate correlation matrix
+    correlation_matrix = correlations_df.corr().loc['Portfolio']
+    logging.info(f"Correlation with Portfolio:\n{correlation_matrix}")
+
+    return correlation_matrix
+
+def calculate_var_artifacts(tickers, fields, period, end_date, confidence_levels, z_scores, groups, principal_df):
     start_date = calculate_start_date(end_date, period)
     historical_data = fetch_historical_data(tickers, fields, start_date, end_date)
     
@@ -859,41 +1102,52 @@ def calculate_var_artifacts(tickers, fields, period, end_date, confidence_levels
 
     # Calculate for each group
     for group_name, group_info in groups.items():
-        group_results[group_name] = process_group(group_name, group_info, tickers, actual_changes, field_name, confidence_levels, z_scores, benchmarks_combined)
+        group_results[group_name] = process_group(group_name, group_info, tickers, actual_changes, field_name, confidence_levels, z_scores, benchmarks_combined, principal_df)
 
     # Calculate portfolio results
-    portfolio_results = process_portfolio(groups, tickers, actual_changes, field_name, confidence_levels, z_scores, benchmarks_combined)
+    portfolio_results = process_portfolio(groups, tickers, actual_changes, field_name, confidence_levels, z_scores, benchmarks_combined, principal_df)
 
+    # Calculate correlations with portfolio
+    correlation_matrix = calculate_correlations_with_portfolio(group_results, portfolio_results)
+    logging.debug(f"Correlation matrix:\n{correlation_matrix}")
+    
     # Create a dictionary with all artifacts
     results = {
         'start_date': start_date,
         'end_date': end_date,
         'historical_data': historical_data,
-        # 'percentage_changes': percentage_changes,
-        # 'processed_percentage_changes': processed_percentage_changes,
         'actual_changes': actual_changes,
         'group_results': group_results,
-        'portfolio_results': portfolio_results
+        'portfolio_results': portfolio_results,
+        'correlation_matrix': correlation_matrix,
     }
 
     return results
 
 def main(tickers, fields, periods, end_date, confidence_levels, z_scores, groups=None):
+    # Perform PCA analysis once for a 5-year period
+    pca_start_date = calculate_start_date(end_date, '5 years')
+    logging.info(f"end_date:\n{end_date}")
+    logging.info(f"pca_start_date:\n{pca_start_date}")
+    
+    principal_df, loadings, explained_variance_ratio = pca_analysis(pca_tickers, pca_start_date, end_date)
+    
+    logging.info(f"PCA analysis completed. Explained variance ratio: {explained_variance_ratio}")
+    logging.info(f"PCA analysis completed. loadings: {loadings}")
+    
     all_results = {}
     for period in periods:
-        results = calculate_var_artifacts(tickers, fields, period, end_date, confidence_levels, z_scores, groups)
+        start_date = calculate_start_date(end_date, period)
+        # Filter principal_df for the current period
+        filtered_principal_df = principal_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
+
+        logging.info(f"Filtered principal_df for period {period} from {start_date} to {end_date}")
+        logging.info(f"Filtered principal_df head:\n{filtered_principal_df.head()}")
+        
+        results = calculate_var_artifacts(tickers, fields, period, end_date, confidence_levels, z_scores, groups, filtered_principal_df)
         if results:
             all_results[period] = results
             logging.info(f"Results for period {period} have been calculated and saved.")
-
-            # Log the beta analysis results for each group
-            for group_name, group_result in results['group_results'].items():
-                beta_analysis_results = group_result['beta_analysis']
-                logging.info(f"Beta analysis results for group {group_name} in period {period}: {beta_analysis_results['beta']}")
-            
-            # Log the beta analysis results for the portfolio
-            beta_analysis_results = results['portfolio_results']['beta_analysis']
-            logging.info(f"Beta analysis results for portfolio in period {period}: {beta_analysis_results['beta']}")
     
-    file_name = save_results_to_file(all_results, groups, tickers, fields, confidence_levels)  # Pass the required arguments
+    file_name = save_results_to_file(all_results, groups, tickers, fields, confidence_levels, loadings, explained_variance_ratio)  # Pass the required arguments
     return all_results, file_name
